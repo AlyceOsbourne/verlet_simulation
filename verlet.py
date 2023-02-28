@@ -8,13 +8,14 @@ import itertools
 from typing import Callable, List, Tuple, NamedTuple
 
 SCREEN_SIZE = (800, 600)
+FPS = 20
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
-NUM_PARTICLES = 100
+NUM_PARTICLES = 10
 DEFAULT_PARTICLE_PROPERTIES = {
-    "mass": 1,
-    "radii": 20,
+        "mass" : 1,
+        "radii": 10,
 }
-DAMPING = 0.3
+DAMPING = 0.97
 GRAVITY = 10
 
 Position = Tuple[float, float]
@@ -41,8 +42,8 @@ class Particle:
     def draw(self, screen):
         radii = self.properties.setdefault("radii", 5)
         colour = self.properties.setdefault(
-            "colour",
-            (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
+                "colour",
+                (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
         )
         pygame.draw.circle(screen, colour, self.position, radii)
 
@@ -51,10 +52,10 @@ class Particle:
 
 
 def varlet(
-    particles: List[Particle],
-    single_pass_constraints: List[Constraint],
-    multi_pass_constraints: List[Constraint],
-    iterations: int = 1,
+        particles: List[Particle],
+        single_pass_constraints: List[Constraint],
+        multi_pass_constraints: List[Constraint],
+        iterations: int = 1,
 ) -> List[Particle]:
     for particle in particles:
         particle = particle.apply_constraints(single_pass_constraints)
@@ -68,8 +69,10 @@ def varlet(
 def apply_gravity(gravity: float):
     def constraint(particle: Particle):
         x, y = particle.old_position
-        mass = particle.properties.setdefault("mass", 1)
-        particle.old_position = x, y + (gravity * mass)
+        mass = int(particle.properties.setdefault("mass", 1))
+        if not 0 < mass < 100:
+            mass = min(max(mass, 0), 100)
+        particle.old_position = x, y - (gravity * mass)
         return particle
 
     return constraint
@@ -80,7 +83,7 @@ def constrain_to_circle(center: Position, radius: float):
         x, y = particle.position
         cx, cy = center
         dx, dy = x - cx, y - cy
-        distance = (dx**2 + dy**2) ** 0.5
+        distance = (dx ** 2 + dy ** 2) ** 0.5
         if distance > radius:
             particle.position = cx + dx / distance * radius, cy + dy / distance * radius
         return particle
@@ -88,12 +91,12 @@ def constrain_to_circle(center: Position, radius: float):
     return constraint
 
 
-def constrain_damping(damping: float):
+def constrain_friction(damping: float):
     def constraint(particle: Particle):
         x, y = particle.position
         ox, oy = particle.old_position
-        if damping < 1:
-            particle.old_position = x + (x - ox) * damping, y + (y - oy) * damping
+        vx, vy = x - ox, y - oy
+        particle.old_position = x - vx * damping, y - vy * damping
         return particle
 
     return constraint
@@ -101,22 +104,19 @@ def constrain_damping(damping: float):
 
 def constrain_particle_collision(particles):
     def constraint(particle: Particle):
-        x, y = particle.old_position
-        for p in particles:
-            px, py = p.old_position
-            dx, dy = x - px, y - py
-            radius = particle.properties.setdefault("radii", 5)
-            pradius = p.properties.setdefault("radii", 5)
-            distance = (dx**2 + dy**2) ** 0.5
-            if distance < radius + pradius:
-                if distance == 0 or distance > radius + pradius:
-                    distance = radius + pradius
-                particle.old_position = px + dx / distance * (
-                    radius + pradius
-                ), py + dy / distance * (radius + pradius)
-                p.old_position = x - dx / distance * (
-                    radius + pradius
-                ), y - dy / distance * (radius + pradius)
+        x, y = particle.position
+        ox, oy = particle.old_position
+        radii = particle.properties.setdefault("radii", 5)
+        for other in particles:
+            if other is particle:
+                continue
+            ox, oy = other.position
+            oradii = other.properties.setdefault("radii", 5)
+            dx, dy = x - ox, y - oy
+            distance = (dx ** 2 + dy ** 2) ** 0.5
+            if distance < radii + oradii:
+                overlap = radii + oradii - distance
+                particle.position = x + dx / distance * overlap, y + dy / distance * overlap
         return particle
 
     return constraint
@@ -129,12 +129,12 @@ def main():
     particles = [
             Particle(
                     position = (
-                            random.randint(0, SCREEN_SIZE[0]),
-                            random.randint(0, SCREEN_SIZE[1]),
+                            SCREEN_CENTER[0] + random.randint(-10, 10),
+                            SCREEN_CENTER[1] + random.randint(-10, 10),
                     ),
                     old_position = (
-                            random.randint(0, SCREEN_SIZE[0]),
-                            random.randint(0, SCREEN_SIZE[1]),
+                            SCREEN_CENTER[0] + random.randint(-10, 10),
+                            SCREEN_CENTER[1] + random.randint(-10, 10),
                     ),
                     **DEFAULT_PARTICLE_PROPERTIES,
             )
@@ -144,9 +144,9 @@ def main():
             apply_gravity(GRAVITY),
     ]
     multi_pass_constraints = [
-            constrain_to_circle(SCREEN_CENTER, SCREEN_SIZE[0] / 3),
             constrain_particle_collision(particles),
-            constrain_damping(DAMPING),
+            constrain_to_circle(SCREEN_CENTER, SCREEN_SIZE[1] / 3),
+            constrain_friction(DAMPING),
     ]
     while True:
         for event in pygame.event.get():
@@ -156,13 +156,13 @@ def main():
 
         screen.fill((0, 0, 0))
 
-        particles = varlet(particles, single_pass_constraints, multi_pass_constraints)
+        particles = varlet(particles, single_pass_constraints, multi_pass_constraints, iterations = 5)
 
         for particle in particles:
             particle.draw(screen)
 
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(FPS)
 
 
 if __name__ == "__main__":

@@ -10,10 +10,11 @@ from typing import Callable, List, Tuple, NamedTuple
 SCREEN_SIZE = (800, 600)
 FPS = 20
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
-NUM_PARTICLES = 10
+NUM_PARTICLES = 100
 DEFAULT_PARTICLE_PROPERTIES = {
         "mass" : 1,
         "radii": 10,
+        'friction': 0.9,
 }
 DAMPING = 0.97
 GRAVITY = 10
@@ -51,9 +52,9 @@ def varlet(
 ) -> List[Particle]:
     for particle in particles:
         particle.update()
+        particle.apply_constraints(single_pass_constraints)
         for _ in range(iterations):
             particle.apply_constraints(multi_pass_constraints)
-        particle.apply_constraints(single_pass_constraints)
     return particles
 
 
@@ -63,6 +64,15 @@ def gravity(particle: Particle):
     if not 0 < mass < 100:
         mass = min(max(mass, 0), 100)
     particle.old_position = x, y - (GRAVITY * mass)
+    return particle
+
+
+def friction(particle: Particle):
+    x, y = particle.position
+    ox, oy = particle.old_position
+    vx, vy = x - ox, y - oy
+    friction = particle.properties.setdefault("friction", 0.999)
+    particle.old_position = x - vx * friction, y - vy * friction
     return particle
 
 
@@ -79,30 +89,23 @@ def constrain_to_circle(center: Position, radius: float):
     return constraint
 
 
-def friction(particle: Particle):
-    x, y = particle.position
-    ox, oy = particle.old_position
-    vx, vy = x - ox, y - oy
-    friction = particle.properties.setdefault("friction", 0.999)
-    particle.old_position = x - vx * friction, y - vy * friction
-    return particle
-
-
 def constrain_particle_collision(particles):
     def constraint(particle: Particle):
-        x, y = particle.position
-        ox, oy = particle.old_position
+        x, y = particle.old_position
         radii = particle.properties.setdefault("radii", 5)
         for other in particles:
             if other is particle:
                 continue
-            ox, oy = other.position
+            ox, oy = other.old_position
             oradii = other.properties.setdefault("radii", 5)
             dx, dy = x - ox, y - oy
             distance = (dx ** 2 + dy ** 2) ** 0.5
             if distance < radii + oradii:
                 overlap = radii + oradii - distance
-                particle.position = x + dx / distance * overlap, y + dy / distance * overlap
+                if distance != 0:
+                    particle.old_position = x + dx / distance * overlap, y + dy / distance * overlap
+                else:
+                    particle.old_position = x + radii, y
         return particle
 
     return constraint

@@ -37,10 +37,10 @@ class Particle:
 
 
 def varlet(
-        particles: List[Particle],
-        single_pass_constraints: List[Constraint],
-        multi_pass_constraints: List[Constraint],
-        iterations: int = 5,
+    particles: List[Particle],
+    single_pass_constraints: List[Constraint],
+    multi_pass_constraints: List[Constraint],
+    iterations: int = 5,
 ) -> List[Particle]:
     for particle in particles:
         particle.update()
@@ -65,10 +65,12 @@ def circle_constraint(center: Position, radius: float) -> Constraint:
         x, y = particle.position
         cx, cy = center
         dx, dy = x - cx, y - cy
-        distance = (dx ** 2 + dy ** 2) ** 0.5
+        distance = (dx**2 + dy**2) ** 0.5
         radii = particle.properties.get("radius", 5)
         if distance > radius - radii:
-            particle.position = cx + dx / distance * (radius - radii), cy + dy / distance * (radius - radii)
+            particle.position = cx + dx / distance * (
+                radius - radii
+            ), cy + dy / distance * (radius - radii)
         return particle
 
     return constraint
@@ -85,25 +87,25 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
             x, y = particle.position
             dx, dy = x - ox, y - oy
             radii_sum = radii + other.properties.get("radius", 5)
-            distance = (dx ** 2 + dy ** 2) ** 0.5
+            distance = (dx**2 + dy**2) ** 0.5
             if distance == 0:
                 distance = 0.0001
             if distance < radii_sum:
                 half_distance = (radii_sum - distance) / 2
                 particle.position = (
-                        x + dx / distance * half_distance,
-                        y + dy / distance * half_distance,
+                    x + dx / distance * half_distance,
+                    y + dy / distance * half_distance,
                 )
                 other.position = (
-                        ox - dx / distance * half_distance,
-                        oy - dy / distance * half_distance,
+                    ox - dx / distance * half_distance,
+                    oy - dy / distance * half_distance,
                 )
         return particle
 
     return constraint
 
 
-def damping(damping: float = 0.1) -> Constraint:
+def damping(damping: float = 0.2) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
         ox, oy = particle.old_position
@@ -119,38 +121,38 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode(SCREEN_SIZE)
     clock = pygame.time.Clock()
     particles = [
-            Particle(
-                    position = (
-                            SCREEN_CENTER[0] + random.randint(-100, 100),
-                            SCREEN_CENTER[1] + random.randint(-100, 100),
-                    ),
-                    old_position = (
-                            SCREEN_CENTER[0] + random.randint(-100, 100),
-                            SCREEN_CENTER[1] + random.randint(-100, 100),
-                    ),
-                    color = (
-                            random.randint(0, 255),
-                            random.randint(0, 255),
-                            random.randint(0, 255),
-                    ),
-                    radius = random.randint(10, 20),
-            )
-            for _ in range(100)
+        Particle(
+            position=(
+                SCREEN_CENTER[0] + random.randint(-200, 200),
+                SCREEN_CENTER[1] + random.randint(-200, 200),
+            ),
+            old_position=(
+                SCREEN_CENTER[0] + random.randint(-100, 100),
+                SCREEN_CENTER[1] + random.randint(-100, 100),
+            ),
+            color=(
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+            ),
+            radius=random.randint(5, 10),
+        )
+        for _ in range(50)
     ]
     single_pass_constraints = [
-            gravity(
-                    acceleration = random.randint(1, 10),
-            ),
+        gravity(
+            acceleration=3
+        ),
     ]
     multi_pass_constraints = [
-            collision_constraint(particles),
-            circle_constraint(SCREEN_CENTER, 200),
-            damping(),
-
+        collision_constraint(particles),
+        circle_constraint(SCREEN_CENTER, 200),
+        damping(
+            damping=0.0001
+        ),
     ]
 
     while True:
-        clock.tick(FPS)
         screen.fill((0, 0, 0))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -159,9 +161,10 @@ if __name__ == "__main__":
         varlet(particles, single_pass_constraints, multi_pass_constraints)
         for particle in particles:
             pygame.draw.circle(
-                    screen,
-                    particle.properties["color"],
-                    particle.position,
-                    particle.properties["radius"],
+                screen,
+                particle.properties["color"],
+                particle.position,
+                particle.properties["radius"],
             )
         pygame.display.flip()
+        clock.tick(FPS)

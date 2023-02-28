@@ -39,14 +39,6 @@ class Particle:
         self.position = x + vx, y + vy
         return self
 
-    def draw(self, screen):
-        radii = self.properties.setdefault("radii", 5)
-        colour = self.properties.setdefault(
-                "colour",
-                (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
-        )
-        pygame.draw.circle(screen, colour, self.position, radii)
-
     def apply_constraints(self, constraints: List[Constraint]):
         return functools.reduce(lambda p, c: c(p), constraints, self)
 
@@ -58,24 +50,20 @@ def varlet(
         iterations: int = 1,
 ) -> List[Particle]:
     for particle in particles:
-        particle = particle.apply_constraints(single_pass_constraints)
-        for _ in range(iterations):
-            particle = particle.apply_constraints(multi_pass_constraints)
         particle.update()
-
+        for _ in range(iterations):
+            particle.apply_constraints(multi_pass_constraints)
+        particle.apply_constraints(single_pass_constraints)
     return particles
 
 
-def apply_gravity(gravity: float):
-    def constraint(particle: Particle):
-        x, y = particle.old_position
-        mass = int(particle.properties.setdefault("mass", 1))
-        if not 0 < mass < 100:
-            mass = min(max(mass, 0), 100)
-        particle.old_position = x, y - (gravity * mass)
-        return particle
-
-    return constraint
+def gravity(particle: Particle):
+    x, y = particle.old_position
+    mass = int(particle.properties.setdefault("mass", 1))
+    if not 0 < mass < 100:
+        mass = min(max(mass, 0), 100)
+    particle.old_position = x, y - (GRAVITY * mass)
+    return particle
 
 
 def constrain_to_circle(center: Position, radius: float):
@@ -91,15 +79,13 @@ def constrain_to_circle(center: Position, radius: float):
     return constraint
 
 
-def constrain_friction(damping: float):
-    def constraint(particle: Particle):
-        x, y = particle.position
-        ox, oy = particle.old_position
-        vx, vy = x - ox, y - oy
-        particle.old_position = x - vx * damping, y - vy * damping
-        return particle
-
-    return constraint
+def friction(particle: Particle):
+    x, y = particle.position
+    ox, oy = particle.old_position
+    vx, vy = x - ox, y - oy
+    friction = particle.properties.setdefault("friction", 0.999)
+    particle.old_position = x - vx * friction, y - vy * friction
+    return particle
 
 
 def constrain_particle_collision(particles):
@@ -141,12 +127,12 @@ def main():
             for _ in range(NUM_PARTICLES)
     ]
     single_pass_constraints = [
-            apply_gravity(GRAVITY),
+            gravity,
+            friction,
     ]
     multi_pass_constraints = [
             constrain_particle_collision(particles),
             constrain_to_circle(SCREEN_CENTER, SCREEN_SIZE[1] / 3),
-            constrain_friction(DAMPING),
     ]
     while True:
         for event in pygame.event.get():
@@ -159,7 +145,12 @@ def main():
         particles = varlet(particles, single_pass_constraints, multi_pass_constraints, iterations = 5)
 
         for particle in particles:
-            particle.draw(screen)
+            radii = particle.properties.setdefault("radii", 5)
+            colour = particle.properties.setdefault(
+                    "colour",
+                    (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
+            )
+            pygame.draw.circle(screen, colour, particle.position, radii)
 
         pygame.display.flip()
         clock.tick(FPS)

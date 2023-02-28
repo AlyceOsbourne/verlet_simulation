@@ -1,8 +1,5 @@
 import functools
-import random
 from typing import Callable, List, Tuple
-
-import pygame
 
 SCREEN_SIZE = (800, 600)
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
@@ -119,58 +116,4 @@ def friction(damping: float = 0.005) -> Constraint:
         vx, vy = x - ox, y - oy
         particle.old_position = x - vx * damping, y - vy * damping
         return particle
-
     return constraint
-
-
-def main():
-    pygame.init()
-    screen = pygame.display.set_mode(SCREEN_SIZE)
-    clock = pygame.time.Clock()
-    particles = [
-            Particle(
-                    position = (
-                            SCREEN_CENTER[0] + random.randint(-200, 200),
-                            SCREEN_CENTER[1] + random.randint(-200, 200),
-                    ),
-                    old_position = (
-                            SCREEN_CENTER[0] + random.randint(-100, 100),
-                            SCREEN_CENTER[1] + random.randint(-100, 100),
-                    ),
-                    color = (
-                            random.randint(0, 255),
-                            random.randint(0, 255),
-                            random.randint(0, 255),
-                    ),
-                    radius = random.randint(5, 10),
-            )
-            for _ in range(80)
-    ]
-    single_pass_constraints = [
-            gravity(acceleration = 3),
-    ]
-    multi_pass_constraints = [
-            collision_constraint(particles),
-            circle_constraint(SCREEN_CENTER, 300),
-            friction(damping = 0.005),
-    ]
-    while True:
-        screen.fill((0, 0, 0))
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-        varlet(particles, single_pass_constraints, multi_pass_constraints, 4)
-        for particle in particles:
-            pygame.draw.circle(
-                    screen,
-                    particle.properties["color"],
-                    particle.position,
-                    particle.properties["radius"],
-            )
-        pygame.display.flip()
-        clock.tick(FPS)
-
-
-if __name__ == "__main__":
-    main()

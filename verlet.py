@@ -29,8 +29,8 @@ class Particle:
         x, y = self.position
         ox, oy = self.old_position
         vx, vy = x - ox, y - oy
-        self.old_position = x, y
-        self.position = x + vx, y + vy
+        self.old_position = round(x, 2), round(y, 2)
+        self.position = round(x + vx, 2), round(y + vy, 2)
         return self
 
     def apply_constraints(self, constraints: List[Constraint]):
@@ -61,9 +61,9 @@ def update_particle(
 
 def gravity(acceleration: float = 3) -> Constraint:
     def constraint(particle: Particle) -> Particle:
-        x, y = particle.old_position
+        x, y = particle.position
         mass = particle.properties.get("mass", particle.properties.get("radius", 5) * 0.05)
-        particle.old_position = x, y - (acceleration * mass)
+        particle.position = x, y + (acceleration * mass)
         return particle
 
     return constraint
@@ -97,23 +97,10 @@ def circle_constraint(center: Position, radius: float) -> Constraint:
     return constraint
 
 
-def get_closest_indices(particles: List[Particle], particle: Particle) -> List[int]:
-    tree = scipy.spatial.cKDTree([p.position for p in particles])
-    return tree.query_ball_point(
-            particle.position,
-            particle.properties.get("radius", 5) * 2,
-            eps = 0,
-            return_sorted = False,
-            workers = -1,
-
-    )
-
-
-# constrain collision between particles
 def collision_constraint(particles: List[Particle]) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         radii = particle.properties.get("radius", 5)
-        for other in itertools.islice(particles, 0, particles.index(particle)):
+        for other in itertools.islice(particles, 0, particles.index(particle) + 1):
             if other is particle:
                 continue
             ox, oy = other.position
@@ -134,8 +121,9 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
                         oy - dy / distance * half_distance,
                 )
         return particle
-
     return constraint
+
+
 
 
 def repulsive_mouse_constraint(force, radius, mouse_location_function):

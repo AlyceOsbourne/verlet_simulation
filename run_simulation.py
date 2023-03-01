@@ -35,15 +35,14 @@ def main():
         )
     ]
     single_pass_constraints = [
-        gravity(.5),
-
+        gravity(.1),
+        friction(.99),
     ]
     multi_pass_constraints = [
-        friction(),
         collision_constraint(particles),
         circle_constraint(SCREEN_CENTER, 300),
     ]
-    iterations = 1
+    iterations = 2
     i = 0
     font = pygame.font.SysFont("Arial", 20)
     while True:

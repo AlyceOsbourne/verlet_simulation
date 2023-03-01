@@ -1,9 +1,8 @@
 import functools
+from random import randint, random
 from typing import Callable, List, Tuple
-
-SCREEN_SIZE = (800, 600)
-SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
-FPS = 30
+import numpy as np
+import numba as nb
 
 Position = Tuple[float, float]
 Constraint = Callable[["Particle"], "Particle"]
@@ -12,7 +11,11 @@ Constraint = Callable[["Particle"], "Particle"]
 class Particle:
     __slots__ = ("position", "old_position", "properties")
 
-    def __init__(self, position: Position, old_position: Position, **properties):
+    def __init__(
+            self,
+            position: Position,
+            old_position: Position,
+            **properties):
         self.position = position
         self.old_position = old_position
         self.properties = properties
@@ -20,7 +23,7 @@ class Particle:
     def __repr__(self):
         return f"Particle(position={self.position}, old_position={self.old_position})"
 
-    def update(self):
+    def update(self: "Particle") -> "Particle":
         x, y = self.position
         ox, oy = self.old_position
         vx, vy = x - ox, y - oy
@@ -57,7 +60,7 @@ def update_particle(
 def gravity(acceleration: float = 3) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.old_position
-        particle.position = x, y + acceleration
+        particle.old_position = x, y - acceleration
         return particle
 
     return constraint
@@ -93,7 +96,7 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
             radii_sum = radii + other.properties.get("radius", 5)
             distance = (dx ** 2 + dy ** 2) ** 0.5
             if distance == 0:
-                distance = 0.0001
+                continue
             if distance < radii_sum:
                 half_distance = (radii_sum - distance) / 2
                 particle.position = (
@@ -109,11 +112,52 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
     return constraint
 
 
-def friction(damping: float = 0.005) -> Constraint:
+def friction(particle: Particle) -> Particle:
+    damping = particle.properties.setdefault("friction_coefficient", 0.001)
+    x, y = particle.position
+    ox, oy = particle.old_position
+    vx, vy = x - ox, y - oy
+    particle.position = x - vx * damping, y - vy * damping
+    return particle
+
+
+def repulsive_mouse_constraint(force, radius, mouse_location_function):
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
-        ox, oy = particle.old_position
-        vx, vy = x - ox, y - oy
-        particle.old_position = x - vx * damping, y - vy * damping
+        mx, my = mouse_location_function()
+        dx, dy = x - mx, y - my
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        if distance < radius:
+            particle.position = x + dx / distance * force, y + dy / distance * force
         return particle
+
     return constraint
+
+
+def magnetic_mouse_constraint(force, radius, mouse_location_function):
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        mx, my = mouse_location_function()
+        dx, dy = x - mx, y - my
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        if distance < radius:
+            particle.position = x - dx / distance * force, y - dy / distance * force
+        return particle
+
+    return constraint
+
+def rotational_force(force, drop_off, mouse_location_function):
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        cx, cy = mouse_location_function()
+        dx, dy = x - cx, y - cy
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        if distance < drop_off:
+            particle.position = x + dy / distance * force, y - dx / distance * force
+        return particle
+
+    return constraint
+
+def simulate(particles, single_pass_constraints, multi_pass_constraints, iterations):
+    while True:
+        yield varlet(particles, single_pass_constraints, multi_pass_constraints, iterations)

@@ -1,8 +1,5 @@
 import functools
-from random import randint, random
 from typing import Callable, List, Tuple
-import numpy as np
-import numba as nb
 
 Position = Tuple[float, float]
 Constraint = Callable[["Particle"], "Particle"]
@@ -60,9 +57,19 @@ def update_particle(
 def gravity(acceleration: float = 3) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.old_position
-        particle.old_position = x, y - acceleration
+        mass = particle.properties.get("mass", particle.properties.get("radius", 5) * 0.01)
+        particle.old_position = x, y - (acceleration * mass)
         return particle
 
+    return constraint
+
+def friction(friction_coefficient = .99999) -> Constraint:
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        ox, oy = particle.old_position
+        vx, vy = x - ox, y - oy
+        particle.old_position = x - vx * friction_coefficient, y - vy * friction_coefficient
+        return particle
     return constraint
 
 
@@ -112,14 +119,6 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
     return constraint
 
 
-def friction(particle: Particle) -> Particle:
-    damping = particle.properties.setdefault("friction_coefficient", 0.001)
-    x, y = particle.position
-    ox, oy = particle.old_position
-    vx, vy = x - ox, y - oy
-    particle.position = x - vx * damping, y - vy * damping
-    return particle
-
 
 def repulsive_mouse_constraint(force, radius, mouse_location_function):
     def constraint(particle: Particle) -> Particle:
@@ -146,6 +145,7 @@ def magnetic_mouse_constraint(force, radius, mouse_location_function):
 
     return constraint
 
+
 def rotational_force(force, drop_off, mouse_location_function):
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
@@ -157,7 +157,3 @@ def rotational_force(force, drop_off, mouse_location_function):
         return particle
 
     return constraint
-
-def simulate(particles, single_pass_constraints, multi_pass_constraints, iterations):
-    while True:
-        yield varlet(particles, single_pass_constraints, multi_pass_constraints, iterations)

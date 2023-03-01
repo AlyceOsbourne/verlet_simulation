@@ -1,10 +1,15 @@
 import functools
+import random
 from typing import Callable, List, Tuple
+
+import numpy as np
 
 Position = Tuple[float, float]
 Constraint = Callable[["Particle"], "Particle"]
-
-
+import scipy
+import numpy
+import itertools
+import functools
 class Particle:
     __slots__ = ("position", "old_position", "properties")
 
@@ -57,19 +62,21 @@ def update_particle(
 def gravity(acceleration: float = 3) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.old_position
-        mass = particle.properties.get("mass", particle.properties.get("radius", 5) * 0.01)
+        mass = particle.properties.get("mass", particle.properties.get("radius", 5) * 0.05)
         particle.old_position = x, y - (acceleration * mass)
         return particle
 
     return constraint
 
-def friction(friction_coefficient = .99999) -> Constraint:
+
+def friction(friction_coefficient = .99) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
         ox, oy = particle.old_position
         vx, vy = x - ox, y - oy
         particle.old_position = x - vx * friction_coefficient, y - vy * friction_coefficient
         return particle
+
     return constraint
 
 
@@ -90,11 +97,23 @@ def circle_constraint(center: Position, radius: float) -> Constraint:
     return constraint
 
 
+def get_closest_indices(particles: List[Particle], particle: Particle) -> List[int]:
+    tree = scipy.spatial.cKDTree([p.position for p in particles])
+    return tree.query_ball_point(
+            particle.position,
+            particle.properties.get("radius", 5) * 2,
+            eps = 0,
+            return_sorted = False,
+            workers = -1,
+
+    )
+
+
 # constrain collision between particles
 def collision_constraint(particles: List[Particle]) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         radii = particle.properties.get("radius", 5)
-        for other in particles:
+        for other in itertools.islice(particles, 0, particles.index(particle)):
             if other is particle:
                 continue
             ox, oy = other.position
@@ -117,7 +136,6 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
         return particle
 
     return constraint
-
 
 
 def repulsive_mouse_constraint(force, radius, mouse_location_function):

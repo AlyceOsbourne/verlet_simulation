@@ -8,7 +8,7 @@ from verlet import (
     friction,
     gravity,
     Particle,
-    varlet,
+    simulate,
 )
 
 SCREEN_SIZE = (800, 600)
@@ -37,9 +37,9 @@ def main():
     single_pass_constraints = [
         gravity(.1),
         friction(.99),
+        collision_constraint(particles),
     ]
     multi_pass_constraints = [
-        collision_constraint(particles),
         circle_constraint(SCREEN_CENTER, 300),
     ]
     iterations = 2
@@ -66,7 +66,7 @@ def main():
             if event.type == pygame.QUIT:
                 return
         screen.fill((0, 0, 0))
-        for particle in varlet(
+        for particle in simulate(
             particles, single_pass_constraints, multi_pass_constraints, iterations
         ):
             color = particle.properties.setdefault(

@@ -7,20 +7,21 @@ from verlet import (
     collision_constraint,
     friction,
     gravity,
-    Particle,
-    simulate,
+    magnetic_mouse_constraint, Particle,
+    repulsive_mouse_constraint, rotational_force, simulate,
 )
 
 SCREEN_SIZE = (800, 600)
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
 FPS = 60
-NUM_PARTICLES = 300
+NUM_PARTICLES = 500
 
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode(SCREEN_SIZE)
     clock = pygame.time.Clock()
+    mouse_location_function = pygame.mouse.get_pos
     particles = [
         Particle(
             position=(
@@ -31,13 +32,21 @@ def main():
                 SCREEN_CENTER[0] + random.randint(-100, 100),
                 SCREEN_CENTER[1] + random.randint(-100, 100),
             ),
-            radius=random.randint(8, 20),
+            radius=random.randint(8, 10),
         )
     ]
     single_pass_constraints = [
-        gravity(.1),
+        gravity(.2),
         friction(.99),
         collision_constraint(particles),
+        magnetic_mouse_constraint(1, 200, mouse_location_function),
+        repulsive_mouse_constraint(3, 140, mouse_location_function),
+        magnetic_mouse_constraint(5, 120, mouse_location_function),
+        repulsive_mouse_constraint(6, 100, mouse_location_function),
+        magnetic_mouse_constraint(7, 80, mouse_location_function),
+        repulsive_mouse_constraint(9, 60, mouse_location_function),
+        magnetic_mouse_constraint(10, 50, mouse_location_function),
+        rotational_force(0.1, 200, mouse_location_function),
     ]
     multi_pass_constraints = [
         circle_constraint(SCREEN_CENTER, 300),
@@ -58,7 +67,7 @@ def main():
                             SCREEN_CENTER[0] + random.randint(-10, 10),
                             SCREEN_CENTER[1] + random.randint(-10, 10),
                         ),
-                        radius=random.randint(8, 20),
+                        radius=random.randint(8, 10),
                     )
                 )
             i += 1

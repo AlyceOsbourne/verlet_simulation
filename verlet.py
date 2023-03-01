@@ -13,7 +13,8 @@ Constraint = Callable[["Particle"], "Particle"]
 
 class Particle:
     __slots__ = (
-    "position", "old_position", "properties", 'single_pass_constraints', 'multi_pass_constraints', 'num_iterations')
+            "position", "old_position", "properties", 'single_pass_constraints', 'multi_pass_constraints',
+            'num_iterations')
 
     def __init__(
             self,
@@ -133,6 +134,45 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
                         ox - dx / distance * half_distance,
                         oy - dy / distance * half_distance,
                 )
+        return particle
+
+    return constraint
+
+
+def repulsive_mouse_constraint(force, radius, mouse_location_function):
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        mx, my = mouse_location_function()
+        dx, dy = x - mx, y - my
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        if distance < radius:
+            particle.position = x + dx / distance * force, y + dy / distance * force
+        return particle
+
+    return constraint
+
+
+def magnetic_mouse_constraint(force, radius, mouse_location_function):
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        mx, my = mouse_location_function()
+        dx, dy = x - mx, y - my
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        if distance < radius:
+            particle.position = x - dx / distance * force, y - dy / distance * force
+        return particle
+
+    return constraint
+
+
+def rotational_force(force, drop_off, mouse_location_function):
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        cx, cy = mouse_location_function()
+        dx, dy = x - cx, y - cy
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        if distance < drop_off:
+            particle.position = x + dy / distance * force, y - dx / distance * force
         return particle
 
     return constraint

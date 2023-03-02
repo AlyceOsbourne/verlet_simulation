@@ -170,14 +170,17 @@ def magnetic_mouse_constraint(force, radius, mouse_location_function):
     return constraint
 
 
-def rotational_force(force, drop_off, mouse_location_function):
+def rotational_force(force, drop_off, mouse_location_function, anti_clockwise=True):
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
         cx, cy = mouse_location_function()
         dx, dy = x - cx, y - cy
         distance = (dx ** 2 + dy ** 2) ** 0.5
         if distance < drop_off:
-            particle.position = x + dy / distance * force, y - dx / distance * force
+            if anti_clockwise:
+                particle.position = x + dy / distance * force, y - dx / distance * force
+            else:
+                particle.position = x - dy / distance * force, y + dx / distance * force
         return particle
 
     return constraint

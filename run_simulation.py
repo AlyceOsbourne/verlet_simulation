@@ -17,8 +17,8 @@ from verlet import (
 SCREEN_SIZE = (800, 600)
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
 FPS = 60
-NUM_PARTICLES = 300
-MIN_RADIUS = 5
+NUM_PARTICLES = 500
+MIN_RADIUS = 4
 MAX_RADIUS = 15
 ITERATIONS = 10
 
@@ -27,6 +27,13 @@ def main():
     pygame.init()
     screen = pygame.display.set_mode(SCREEN_SIZE)
     clock = pygame.time.Clock()
+
+    def position_function():
+        # if pygame is focused, use the mouse position
+        if pygame.mouse.get_focused():
+            return pygame.mouse.get_pos()
+        return SCREEN_CENTER
+
     particles = [
         Particle(
             position=(
@@ -41,20 +48,15 @@ def main():
         )
     ]
     single_pass_constraints = [
-        gravity(0.3),
-        rotational_force(0.1, 200, pygame.mouse.get_pos),
-        magnetic_mouse_constraint(1, 200, pygame.mouse.get_pos),
-        repulsive_mouse_constraint(3, 140, pygame.mouse.get_pos),
-        magnetic_mouse_constraint(5, 120, pygame.mouse.get_pos),
-        repulsive_mouse_constraint(6, 100, pygame.mouse.get_pos),
-        magnetic_mouse_constraint(7, 80, pygame.mouse.get_pos),
-        repulsive_mouse_constraint(9, 60, pygame.mouse.get_pos),
-        magnetic_mouse_constraint(10, 50, pygame.mouse.get_pos),
+        gravity(1),
+        rotational_force(0.1, 250, position_function),
+        magnetic_mouse_constraint(1, 200, position_function),
+        repulsive_mouse_constraint(2, 150, position_function),
         collision_constraint(particles),
     ]
     multi_pass_constraints = [
-        friction(0.99),
-        circle_constraint(SCREEN_CENTER, 300),
+        friction(0.9999),
+        circle_constraint(SCREEN_CENTER, 250),
     ]
     i = 0
     font = pygame.font.SysFont("Arial", 20)

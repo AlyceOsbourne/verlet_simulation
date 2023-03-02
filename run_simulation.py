@@ -7,14 +7,20 @@ from verlet import (
     collision_constraint,
     friction,
     gravity,
-    magnetic_mouse_constraint, Particle,
-    repulsive_mouse_constraint, rotational_force, simulate,
+    magnetic_mouse_constraint,
+    Particle,
+    repulsive_mouse_constraint,
+    rotational_force,
+    simulate,
 )
 
 SCREEN_SIZE = (800, 600)
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
 FPS = 60
-NUM_PARTICLES = 400
+NUM_PARTICLES = 300
+MIN_RADIUS = 5
+MAX_RADIUS = 15
+ITERATIONS = 10
 
 
 def main():
@@ -31,26 +37,25 @@ def main():
                 SCREEN_CENTER[0] + random.randint(-100, 100),
                 SCREEN_CENTER[1] + random.randint(-100, 100),
             ),
-            radius=random.randint(8, 20),
+            radius=random.randint(MIN_RADIUS, MAX_RADIUS),
         )
     ]
     single_pass_constraints = [
-        gravity(.2),
-        # magnetic_mouse_constraint(1, 200, mouse_location_function),
-        # repulsive_mouse_constraint(3, 140, mouse_location_function),
-        # magnetic_mouse_constraint(5, 120, mouse_location_function),
-        # repulsive_mouse_constraint(6, 100, mouse_location_function),
-        # magnetic_mouse_constraint(7, 80, mouse_location_function),
-        # repulsive_mouse_constraint(9, 60, mouse_location_function),
-        # magnetic_mouse_constraint(10, 50, mouse_location_function),
-        # rotational_force(0.1, 200, mouse_location_function),
+        gravity(0.3),
+        rotational_force(0.1, 200, pygame.mouse.get_pos),
+        magnetic_mouse_constraint(1, 200, pygame.mouse.get_pos),
+        repulsive_mouse_constraint(3, 140, pygame.mouse.get_pos),
+        magnetic_mouse_constraint(5, 120, pygame.mouse.get_pos),
+        repulsive_mouse_constraint(6, 100, pygame.mouse.get_pos),
+        magnetic_mouse_constraint(7, 80, pygame.mouse.get_pos),
+        repulsive_mouse_constraint(9, 60, pygame.mouse.get_pos),
+        magnetic_mouse_constraint(10, 50, pygame.mouse.get_pos),
+        collision_constraint(particles),
     ]
     multi_pass_constraints = [
-        collision_constraint(particles),
-        friction(.99),
+        friction(0.99),
         circle_constraint(SCREEN_CENTER, 300),
     ]
-    iterations = 2
     i = 0
     font = pygame.font.SysFont("Arial", 20)
     while True:
@@ -63,10 +68,10 @@ def main():
                             SCREEN_CENTER[1] - 30,
                         ),
                         old_position=(
-                            SCREEN_CENTER[0] + random.randint(-10, 10),
-                            SCREEN_CENTER[1] + random.randint(-10, 10),
+                            SCREEN_CENTER[0] + random.randint(-5, 5),
+                            SCREEN_CENTER[1] + random.randint(-5, 5),
                         ),
-                        radius=random.randint(8, 20),
+                        radius=random.randint(MIN_RADIUS, MAX_RADIUS),
                     )
                 )
             i += 1
@@ -75,7 +80,7 @@ def main():
                 return
         screen.fill((0, 0, 0))
         for particle in simulate(
-            particles, single_pass_constraints, multi_pass_constraints, iterations
+            particles, single_pass_constraints, multi_pass_constraints, ITERATIONS
         ):
             color = particle.properties.setdefault(
                 "color",

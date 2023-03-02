@@ -71,7 +71,7 @@ def simulate(
 def gravity(acceleration: float = 3) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
-        mass = particle.properties.get("mass", particle.properties.get("radius", 5) * 0.05)
+        mass = particle.properties.get("mass", particle.properties.get("radius", 5) * 0.02)
         particle.position = x, y + (acceleration * mass)
         return particle
 
@@ -105,16 +105,21 @@ def circle_constraint(center: Position, radius: float) -> Constraint:
     return constraint
 
 
-def get_nearby_particles(particles: List[Particle], particle):
-    for other in itertools.islice(particles, 0, particles.index(particle) + 1):
-        if abs(other.position[0] - particle.position[0]) < 50 and abs(other.position[1] - particle.position[1]) < 50:
-            yield other
-
-
 def collision_constraint(particles: List[Particle]) -> Constraint:
+    def get_nearby_particles(particle):
+        for other in itertools.islice(particles, 0, particles.index(particle) + 1):
+            dist_x = abs(particle.position[0] - other.position[0])
+            if dist_x > 40:
+                continue
+            dist_y = abs(particle.position[1] - other.position[1])
+            if dist_y > 40:
+                continue
+            if dist_x < 40 and dist_y < 40:
+                yield other
+
     def constraint(particle: Particle) -> Particle:
         radii = particle.properties.get("radius", 5)
-        for other in get_nearby_particles(particles, particle):
+        for other in get_nearby_particles( particle):
             if other is particle:
                 continue
             ox, oy = other.position

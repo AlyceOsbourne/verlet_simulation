@@ -71,7 +71,7 @@ def main():
             if event.type == pygame.QUIT:
                 return
         screen.fill((0, 0, 0))
-        for particle in async_simulate(
+        for particle in simulate(
             particles, single_pass_constraints, multi_pass_constraints, ITERATIONS
         ):
             color = particle.properties.setdefault(
@@ -84,7 +84,6 @@ def main():
             )
             radius = particle.properties.setdefault("radius", random.randint(5, 10))
             pygame.draw.circle(screen, color, particle.position, radius)
-        # print num particles and fps
         text = font.render(
             f"Particles: {len(particles)} FPS: {int(clock.get_fps())}",
             True,

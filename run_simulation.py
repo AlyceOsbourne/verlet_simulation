@@ -1,15 +1,14 @@
 import random
-
 import pygame
-
+import asyncio
 from verlet import (
     circle_constraint,
-    collision_constraint,
+    collision_constraint_2,
     friction,
     gravity,
-    magnetic_mouse_constraint,
+    magnetic_force,
     Particle,
-    repulsive_mouse_constraint,
+    repulsive_force,
     rotational_force,
     simulate,
 )
@@ -17,22 +16,16 @@ from verlet import (
 SCREEN_SIZE = (800, 600)
 SCREEN_CENTER = (SCREEN_SIZE[0] / 2, SCREEN_SIZE[1] / 2)
 FPS = 60
-NUM_PARTICLES = 500
+NUM_PARTICLES = 400
 MIN_RADIUS = 4
 MAX_RADIUS = 15
-ITERATIONS = 10
+ITERATIONS = 3
 
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode(SCREEN_SIZE)
     clock = pygame.time.Clock()
-
-    def position_function():
-        # if pygame is focused, use the mouse position
-        if pygame.mouse.get_focused():
-            return pygame.mouse.get_pos()
-        return SCREEN_CENTER
 
     particles = [
         Particle(
@@ -49,13 +42,10 @@ def main():
     ]
     single_pass_constraints = [
         gravity(1),
-        rotational_force(0.1, 250, position_function),
-        magnetic_mouse_constraint(1, 200, position_function),
-        repulsive_mouse_constraint(2, 150, position_function),
-        collision_constraint(particles),
     ]
     multi_pass_constraints = [
-        friction(0.9999),
+        friction(0.99),
+        collision_constraint_2(particles),
         circle_constraint(SCREEN_CENTER, 250),
     ]
     i = 0
@@ -81,7 +71,7 @@ def main():
             if event.type == pygame.QUIT:
                 return
         screen.fill((0, 0, 0))
-        for particle in simulate(
+        for particle in async_simulate(
             particles, single_pass_constraints, multi_pass_constraints, ITERATIONS
         ):
             color = particle.properties.setdefault(
@@ -103,7 +93,6 @@ def main():
         screen.blit(text, (10, 10))
         pygame.display.flip()
         clock.tick(FPS)
-
 
 if __name__ == "__main__":
     main()

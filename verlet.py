@@ -1,3 +1,5 @@
+import asyncio
+import math
 from typing import Callable, List, Tuple
 
 import pygame
@@ -6,6 +8,8 @@ import scipy.sparse as sparse
 import numpy
 import itertools
 import functools
+import multiprocessing
+
 
 Position = Tuple[float, float]
 Constraint = Callable[["Particle"], "Particle"]
@@ -29,7 +33,7 @@ class Particle:
         self.properties = properties
         self.single_pass_constraints = single_pass_constraints or []
         self.multi_pass_constraints = multi_pass_constraints or []
-        self.num_iterations = num_iterations = 0
+        self.num_iterations = num_iterations
 
     def __repr__(self):
         return f"Particle(position={self.position}, old_position={self.old_position})"
@@ -38,8 +42,8 @@ class Particle:
         x, y = self.position
         ox, oy = self.old_position
         vx, vy = x - ox, y - oy
-        self.old_position = round(x, 2), round(y, 2)
-        self.position = round(x + vx, 2), round(y + vy, 2)
+        self.old_position = x, y
+        self.position = x + vx, y + vy
         return self
 
     def apply_constraints(self, constraints: List[Constraint]):
@@ -56,6 +60,10 @@ class Particle:
         return self
 
 
+    def __hash__(self):
+        return id(self)
+
+
 def simulate(
         particles: List[Particle],
         single_pass_constraints: List[Constraint],
@@ -68,6 +76,10 @@ def simulate(
     )
 
 
+
+
+
+# Forces
 def gravity(acceleration: float = 3) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
@@ -89,6 +101,7 @@ def friction(friction_coefficient = .99) -> Constraint:
     return constraint
 
 
+# Constraints
 def circle_constraint(center: Position, radius: float) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
@@ -105,30 +118,32 @@ def circle_constraint(center: Position, radius: float) -> Constraint:
     return constraint
 
 
-def collision_constraint(particles: List[Particle]) -> Constraint:
-    def get_nearby_particles(particle):
-        for other in itertools.islice(particles, 0, particles.index(particle) + 1):
-            dist_x = abs(particle.position[0] - other.position[0])
-            if dist_x > 40:
-                continue
-            dist_y = abs(particle.position[1] - other.position[1])
-            if dist_y > 40:
-                continue
-            if dist_x < 40 and dist_y < 40:
-                yield other
+def get_nearby_particles(particle, particles):
+    _range = particle.properties.get("radius", 5) + 30
+    for other in itertools.islice(particles, 0, particles.index(particle) + 1):
+        dist_x = abs(particle.position[0] - other.position[0])
+        if dist_x > _range:
+            continue
+        dist_y = abs(particle.position[1] - other.position[1])
+        if dist_y > _range:
+            continue
+        if dist_x < _range and dist_y < _range:
+            yield other
 
+
+def collision_constraint(particles: List[Particle]) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         radii = particle.properties.get("radius", 5)
-        for other in get_nearby_particles( particle):
+        for other in get_nearby_particles(particle, particles):
             if other is particle:
                 continue
             ox, oy = other.position
             x, y = particle.position
             dx, dy = x - ox, y - oy
-            radii_sum = radii + other.properties.get("radius", 5)
-            distance = (dx ** 2 + dy ** 2) ** 0.5
+            distance = math.hypot(dx, dy)
             if distance == 0:
-                continue
+                distance = 0.0001
+            radii_sum = radii + other.properties.get("radius", 5)
             if distance < radii_sum:
                 half_distance = (radii_sum - distance) / 2
                 particle.position = (
@@ -144,7 +159,45 @@ def collision_constraint(particles: List[Particle]) -> Constraint:
     return constraint
 
 
-def repulsive_mouse_constraint(force, radius, mouse_location_function):
+@functools.lru_cache(maxsize = 1000)
+def _adjust(other, particle):
+    x, y = particle
+    ox, oy = other
+    dx, dy = x - ox, y - oy
+    return dx, dy, ox, oy, x, y
+
+
+@functools.lru_cache(maxsize = 1000)
+def _sum_dist(other_radius, radius):
+    return radius + other_radius
+
+
+@functools.lru_cache(maxsize = 1000)
+def _hypot_distance(other, particle):
+    distance = math.hypot(particle[0] - other[0], particle[1] - other[1])
+    return distance
+
+
+def collision_constraint_2(particles):
+    def constraint(particle):
+        radius = particle.properties.get("radius", 5)
+        for other in get_nearby_particles(particle, particles):
+            if other is particle:
+                continue
+            distance = _hypot_distance(other.position, particle.position)
+            radii_sum = _sum_dist(other.properties.get("radius", 5), radius)
+            if distance < radii_sum:
+                half_distance = (radii_sum - distance) / 2
+                dx, dy, ox, oy, x, y = _adjust(other.position, particle.position)
+                particle.position = (x + dx / distance * half_distance, y + dy / distance * half_distance)
+                other.position = (ox - dx / distance * half_distance, oy - dy / distance * half_distance)
+        return particle
+
+    return constraint
+
+
+# Effectors
+def repulsive_force(force, radius, mouse_location_function):
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
         mx, my = mouse_location_function()
@@ -157,7 +210,7 @@ def repulsive_mouse_constraint(force, radius, mouse_location_function):
     return constraint
 
 
-def magnetic_mouse_constraint(force, radius, mouse_location_function):
+def magnetic_force(force, radius, mouse_location_function):
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
         mx, my = mouse_location_function()
@@ -170,7 +223,7 @@ def magnetic_mouse_constraint(force, radius, mouse_location_function):
     return constraint
 
 
-def rotational_force(force, drop_off, mouse_location_function, anti_clockwise=True):
+def rotational_force(force, drop_off, mouse_location_function, anti_clockwise = True):
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
         cx, cy = mouse_location_function()
@@ -184,3 +237,7 @@ def rotational_force(force, drop_off, mouse_location_function, anti_clockwise=Tr
         return particle
 
     return constraint
+
+
+if __name__ == "__main__":
+    import cProfile

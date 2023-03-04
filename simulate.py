@@ -19,7 +19,7 @@ BACKGROUND_COLOR = (0, 0, 0)
 PARTICLE_RADIUS = 5
 PARTICLE_FRICTION = 0.99
 PARTICLE_GRAVITY = 0.2
-PARTICLE_COUNT = 1000
+PARTICLE_COUNT = 5000
 CELL_SIZE = PARTICLE_RADIUS * 2
 MULTI_PASS_PASSES = 3
 FPS = 60
@@ -90,9 +90,9 @@ def main(render_grid=False, render_particles=True, cull_grid=False):
     single_pass_constraints = [
         gravity(PARTICLE_GRAVITY),
         circle_constraint((SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2), 300),
-        # rotational_force(0.1, 200, position_function),
-        # magnetic_force(0.1, 300, position_function),
-        # repulsive_force(0.3, 100, position_function),
+        rotational_force(0.1, 200, position_function),
+        magnetic_force(0.1, 300, position_function),
+        repulsive_force(0.3, 100, position_function),
     ]
     multi_pass_constraints = [
         friction(PARTICLE_FRICTION),
@@ -138,15 +138,25 @@ def main(render_grid=False, render_particles=True, cull_grid=False):
 
 
 if __name__ == "__main__":
-    profile = False
+    profile = True
     if profile:
         import cProfile
         import pstats
 
-        cProfile.run(
-            "main(render_grid=True, render_particles=False, cull_grid=True)", "profile"
-        )
-        p = pstats.Stats("profile")
-        p.strip_dirs().sort_stats("cumulative").print_stats(20)
+        def filter_builtins(stats):
+            for stat in stats:
+                if stat[0].startswith("builtins"):
+                    continue
+                yield stat
+
+
+        cProfile.run("main(render_grid=False, render_particles=False, cull_grid=True)", "stats")
+        stats = pstats.Stats("stats")
+        stats.strip_dirs()
+        stats.sort_stats("time")
+        stats.print_stats(20)
+        stats.sort_stats("calls")
+        stats.print_stats(20)
+
     else:
-        main(render_grid=False, render_particles=True, cull_grid=True)
+        main(render_grid=True, render_particles=True, cull_grid=True)

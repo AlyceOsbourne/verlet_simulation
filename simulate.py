@@ -1,15 +1,17 @@
 import random
 
 from particle import (
-    circle_constraint,
     Particle,
-    gravity,
-    friction,
+)
+from constraints import (
+    circle_constraint,
     collision_constraint_2,
-    screen_constraint,
-    rotational_force,
+    friction,
+    gravity,
     magnetic_force,
     repulsive_force,
+    rotational_force,
+    screen_constraint,
 )
 from spatial_hash_grid import SpatialHashGrid
 import pygame
@@ -100,7 +102,9 @@ def main(render_grid=False, render_particles=True, cull_grid=False):
     ]
     running = True
     i = 0
+
     while running:
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -110,20 +114,19 @@ def main(render_grid=False, render_particles=True, cull_grid=False):
                     MULTI_PASS_PASSES, single_pass_constraints, multi_pass_constraints
                 )
             )
-        if i % 10 == 0:
-            screen.fill(BACKGROUND_COLOR)
-            if render_grid:
-                grid.draw(screen)
-            if render_particles:
-                sprite_group.update()
-                sprite_group.draw(screen)
-            text = font.render(
-                f"Particles: {len(particles)} FPS: {clock.get_fps():.2f}",
-                True,
-                (255, 255, 255),
-            )
-            screen.blit(text, (0, 0))
-            pygame.display.flip()
+        screen.fill(BACKGROUND_COLOR)
+        if render_grid:
+            grid.draw(screen)
+        if render_particles:
+            sprite_group.update()
+            sprite_group.draw(screen)
+        text = font.render(
+            f"Particles: {len(particles)} FPS: {clock.get_fps():.2f}",
+            True,
+            (255, 255, 255),
+        )
+        screen.blit(text, (0, 0))
+        pygame.display.flip()
         clock.tick(FPS)
         if i & 10 == 0 and len(particles) < PARTICLE_COUNT:
             add_particle(particles, grid, sprite_group)
@@ -138,7 +141,7 @@ def main(render_grid=False, render_particles=True, cull_grid=False):
 
 
 if __name__ == "__main__":
-    profile = True
+    profile = False
     if profile:
         import cProfile
         import pstats
@@ -149,8 +152,9 @@ if __name__ == "__main__":
                     continue
                 yield stat
 
-
-        cProfile.run("main(render_grid=False, render_particles=False, cull_grid=True)", "stats")
+        cProfile.run(
+            "main(render_grid=False, render_particles=False, cull_grid=True)", "stats"
+        )
         stats = pstats.Stats("stats")
         stats.strip_dirs()
         stats.sort_stats("time")
@@ -159,4 +163,4 @@ if __name__ == "__main__":
         stats.print_stats(20)
 
     else:
-        main(render_grid=True, render_particles=True, cull_grid=True)
+        main(render_grid=False, render_particles=True, cull_grid=True)

@@ -89,14 +89,14 @@ def main(render_grid=False, render_particles=True, cull_grid=False):
     sprite_group = pygame.sprite.Group()
     single_pass_constraints = [
         gravity(PARTICLE_GRAVITY),
+        circle_constraint((SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2), 300),
+        # rotational_force(0.1, 200, position_function),
+        # magnetic_force(0.1, 300, position_function),
+        # repulsive_force(0.3, 100, position_function),
     ]
     multi_pass_constraints = [
-        circle_constraint((SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2), 300),
         friction(PARTICLE_FRICTION),
         collision_constraint_2(grid),
-        rotational_force(0.1, 200, position_function),
-        magnetic_force(0.1, 300, position_function),
-        repulsive_force(0.3, 100, position_function),
     ]
     running = True
     i = 0
@@ -143,8 +143,10 @@ if __name__ == "__main__":
         import cProfile
         import pstats
 
-        cProfile.run("main(render_grid=True, render_particles=False, cull_grid=True)", "profile")
+        cProfile.run(
+            "main(render_grid=True, render_particles=False, cull_grid=True)", "profile"
+        )
         p = pstats.Stats("profile")
         p.strip_dirs().sort_stats("cumulative").print_stats(20)
     else:
-        main(render_grid=True, render_particles=False, cull_grid=True)
+        main(render_grid=False, render_particles=True, cull_grid=True)

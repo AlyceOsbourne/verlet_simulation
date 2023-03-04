@@ -15,7 +15,8 @@ class Particle:
             "single_pass_constraints",
             "multi_pass_constraints",
             "num_iterations",
-            'skip_pass'
+            'skip_pass',
+            'idle_frames',
     )
 
     def __init__(
@@ -34,6 +35,7 @@ class Particle:
         self.multi_pass_constraints = multi_pass_constraints or []
         self.num_iterations = num_iterations
         self.skip_pass = False
+        self.idle_frames = 0
 
     def __repr__(self):
         return f"Particle(position={self.position}, old_position={self.old_position})"
@@ -57,12 +59,16 @@ class Particle:
     ):
         vx, vy = self.velocity
         if all([
-                math.isclose(vx, 0, rel_tol=0.1),
-                math.isclose(vy, 0, rel_tol=0.1),
+                math.isclose(vx, 0, rel_tol=self.properties.get('radius', 0.1)),
+                math.isclose(vy, 0, rel_tol=self.properties.get('radius', 0.1)),
         ]):
-            self.skip_pass = not self.skip_pass
-            if self.skip_pass:
-                return self
+            self.idle_frames += 1
+            if self.idle_frames > 10:
+                self.skip_pass = not self.skip_pass
+                if self.skip_pass:
+                    return self
+        else:
+            self.idle_frames = 0
         self.update()
         self.apply_constraints(single_pass_constraints)
         self.apply_constraints(self.single_pass_constraints)

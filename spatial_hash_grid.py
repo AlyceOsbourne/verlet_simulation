@@ -1,18 +1,25 @@
 # Particle compatible spatial hash grid for collision detection
-import sys
 from collections import defaultdict
 from math import floor, hypot
-from typing import Dict, Iterable, List, Protocol, Set, Tuple, TypeVar
-
+import typing
+import functools
 import pygame
 
-Grid = Dict[Tuple[int, int], Set["Particle"]]
-Particle = TypeVar("Particle")
+Grid = typing.Dict[typing.Tuple[int, int], typing.Set["Particle"]]
+Particle = typing.TypeVar("Particle")
 
-
-def _get_nearby_cells(cell: Tuple[int, int]) -> Iterable[Tuple[int, int]]:
+@functools.lru_cache(maxsize = 1000)
+def _get_nearby_cells(cell: typing.Tuple[int, int], only_cardinal) -> typing.Iterable[typing.Tuple[int, int]]:
     """Get nearby cells for a given cell"""
     x, y = cell
+    if only_cardinal:
+        return (
+                (x, y - 1),
+                (x - 1, y),
+                (x, y),
+                (x + 1, y),
+                (x, y + 1),
+        )
     return (
             (x - 1, y - 1),
             (x, y - 1),
@@ -26,7 +33,8 @@ def _get_nearby_cells(cell: Tuple[int, int]) -> Iterable[Tuple[int, int]]:
     )
 
 
-def _get_cell(position: Tuple[float, float], cell_size) -> Tuple[int, int]:
+@functools.lru_cache(maxsize = 1000)
+def _get_cell(position: typing.Tuple[float, float], cell_size) -> typing.Tuple[int, int]:
     """Get the cell for a given position"""
     return (
             floor(position[0] / cell_size),
@@ -75,9 +83,9 @@ class SpatialHashGrid:
             self.grid[cell].add(particle)
             particle.properties["cell"] = cell
 
-    def get_nearby_particles(self, particle: Particle) -> Iterable[Particle]:
+    def get_nearby_particles(self, particle: Particle, only_cardinal=False) -> typing.Iterable[Particle]:
         cell = particle.properties["cell"]
-        for nearby_cell in _get_nearby_cells(cell):
+        for nearby_cell in _get_nearby_cells(cell, only_cardinal):
             yield from self.grid[nearby_cell]
 
 

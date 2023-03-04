@@ -1,28 +1,33 @@
 import random
 
 from particle import (
+    circle_constraint,
     Particle,
     gravity,
     friction,
-    circle_constraint,
     collision_constraint_2,
     screen_constraint,
-    repulsive_force,
+    rotational_force,
     magnetic_force,
-    rotational_force
+    repulsive_force,
 )
 from spatial_hash_grid import SpatialHashGrid
 import pygame
 
 SCREEN_SIZE = (800, 600)
 BACKGROUND_COLOR = (0, 0, 0)
-PARTICLE_RADIUS = 6
-PARTICLE_FRICTION = 0.95
-PARTICLE_GRAVITY = .5
-PARTICLE_COUNT = 10000
+PARTICLE_RADIUS = 5
+PARTICLE_FRICTION = 0.99
+PARTICLE_GRAVITY = 0.2
+PARTICLE_COUNT = 1000
 CELL_SIZE = PARTICLE_RADIUS * 2
-MULTI_PASS_PASSES = 2
-FPS = 999
+MULTI_PASS_PASSES = 3
+FPS = 60
+
+pygame.init()
+screen = pygame.display.set_mode(SCREEN_SIZE)
+clock = pygame.time.Clock()
+font = pygame.font.SysFont("Arial", 16)
 
 
 def position_function():
@@ -30,73 +35,101 @@ def position_function():
         return SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2
     return pygame.mouse.get_pos()
 
-def add_particle(particles, grid):
+
+class ParticleSprite(pygame.sprite.Sprite):
+    # us ised to render the particles, but instead of reblitting cirles, we just move the rect
+    def __init__(self, particle):
+        super().__init__()
+        self.particle = particle
+        self.radius = particle.properties.get("radius", PARTICLE_RADIUS)
+        self.color = particle.properties.get("color", (255, 255, 255))
+        self.image = pygame.Surface((self.radius * 2, self.radius * 2))
+        self.image.fill((0, 0, 0))
+        self.image.set_colorkey((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.center = particle.position
+        pygame.draw.circle(
+            self.image,
+            self.color,
+            (self.rect.width // 2, self.rect.height // 2),
+            self.radius,
+        )
+
+    def update(self):
+        self.rect.center = self.particle.position
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+
+def add_particle(particles, grid, sprite_group):
     particle = Particle(
-            # distribute particles evenly over the space
-            position = (
-                    SCREEN_SIZE[0] // 2 + random.randint(-1, 1),
-                    (SCREEN_SIZE[1] // 10)
-            ),
-            old_position = (
-                    SCREEN_SIZE[0] // 2 + random.randint(-1, 1),
-                    (SCREEN_SIZE[1] // 10)
-            ),
-            radius = PARTICLE_RADIUS,
-            color = (
-                    random.randint(0, 255),
-                    random.randint(0, 255),
-                    random.randint(0, 255),
-            ),
+        # distribute particles evenly over the space
+        position=(SCREEN_SIZE[0] // 2 + random.randint(-2, 2), (SCREEN_SIZE[1] // 10)),
+        old_position=(
+            SCREEN_SIZE[0] // 2 + random.randint(-2, 2),
+            (SCREEN_SIZE[1] // 10),
+        ),
+        radius=PARTICLE_RADIUS,
+        color=(
+            random.randint(0, 255),
+            random.randint(0, 255),
+            random.randint(0, 255),
+        ),
     )
     particles.append(particle)
     grid.add_particle(particle)
+    sprite_group.add(ParticleSprite(particle))
 
-def main():
+
+def main(render_grid=False, render_particles=True, cull_grid=False):
+
     grid = SpatialHashGrid(CELL_SIZE)
     particles = []
+    sprite_group = pygame.sprite.Group()
     single_pass_constraints = [
-            gravity(PARTICLE_GRAVITY),
+        gravity(PARTICLE_GRAVITY),
     ]
     multi_pass_constraints = [
-            screen_constraint(SCREEN_SIZE),
-            friction(PARTICLE_FRICTION),
-            collision_constraint_2(grid),
+        circle_constraint((SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2), 300),
+        friction(PARTICLE_FRICTION),
+        collision_constraint_2(grid),
+        rotational_force(0.1, 200, position_function),
+        magnetic_force(0.1, 300, position_function),
+        repulsive_force(0.3, 100, position_function),
     ]
-    pygame.init()
-    screen = pygame.display.set_mode(SCREEN_SIZE)
-    clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Arial", 16)
     running = True
     i = 0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        screen.fill(BACKGROUND_COLOR)
-        grid.draw(screen)
         for particle in particles:
             grid.update_particle(
-                    particle.simulate(
-                            MULTI_PASS_PASSES, single_pass_constraints, multi_pass_constraints
-                    )
+                particle.simulate(
+                    MULTI_PASS_PASSES, single_pass_constraints, multi_pass_constraints
+                )
             )
-            x, y = particle.position
-            radius = particle.properties.setdefault("radius", PARTICLE_RADIUS)
-            color = particle.properties.get("color", (255, 255, 255))
-            pygame.draw.circle(screen, color, (int(x), int(y)), radius)
-        # show the number of particles, and the number of cells, and the fps
-        text = font.render(
+        if i % 10 == 0:
+            screen.fill(BACKGROUND_COLOR)
+            if render_grid:
+                grid.draw(screen)
+            if render_particles:
+                sprite_group.update()
+                sprite_group.draw(screen)
+            text = font.render(
                 f"Particles: {len(particles)} FPS: {clock.get_fps():.2f}",
                 True,
                 (255, 255, 255),
-        )
-        screen.blit(text, (0, 0))
-        pygame.display.flip()
+            )
+            screen.blit(text, (0, 0))
+            pygame.display.flip()
         clock.tick(FPS)
         if i & 10 == 0 and len(particles) < PARTICLE_COUNT:
-            add_particle(particles, grid)
-        if i % 600 == 0:
-            grid.sweep_empty_cells()
+            add_particle(particles, grid, sprite_group)
+        if i % 30000 == 0:
+            if cull_grid:
+                grid.sweep_empty_cells()
             i = 0
         else:
             i += 1
@@ -105,4 +138,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    profile = False
+    if profile:
+        import cProfile
+        import pstats
+
+        cProfile.run("main(render_grid=True, render_particles=False, cull_grid=True)", "profile")
+        p = pstats.Stats("profile")
+        p.strip_dirs().sort_stats("cumulative").print_stats(20)
+    else:
+        main(render_grid=True, render_particles=False, cull_grid=True)

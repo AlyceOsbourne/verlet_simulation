@@ -55,10 +55,11 @@ class Particle:
             single_pass_constraints,
             multi_pass_constraints,
     ):
-        # if the particle has barely moved, don't bother simulating it
-        # if the difference between its old position and its current position is less than 1
-        # then we can assume that it hasn't moved much
-        if math.hypot(*self.position) - math.hypot(*self.old_position) < 1:
+        vx, vy = self.velocity
+        if all([
+                math.isclose(vx, 0, rel_tol=0.1),
+                math.isclose(vy, 0, rel_tol=0.1),
+        ]):
             self.skip_pass = not self.skip_pass
             if self.skip_pass:
                 return self
@@ -73,6 +74,14 @@ class Particle:
 
     def __hash__(self):
         return id(self)
+
+    @property
+    def velocity(self):
+        return self.position[0] - self.old_position[0], self.position[1] - self.old_position[1]
+
+    @velocity.setter
+    def velocity(self, value):
+        self.old_position = self.position[0] - value[0], self.position[1] - value[1]
 
 
 def simulate(
@@ -109,17 +118,6 @@ def friction(friction_coefficient = .99) -> Constraint:
         return particle
 
     return constraint
-def get_nearby_particles(particle, particles):
-    _range = particle.properties.get("radius", 5) + 30
-    for other in itertools.islice(particles, 0, particles.index(particle) + 1):
-        dist_x = abs(particle.position[0] - other.position[0])
-        if dist_x > _range:
-            continue
-        dist_y = abs(particle.position[1] - other.position[1])
-        if dist_y > _range:
-            continue
-        if dist_x < _range and dist_y < _range:
-            yield other
 
 
 @functools.lru_cache(maxsize = 1000)
@@ -141,24 +139,6 @@ def _hypot_distance(other, particle):
     return distance
 
 
-def collision_constraint(particles):
-    def constraint(particle):
-        radius = particle.properties.get("radius", 5)
-        for other in get_nearby_particles(particle, particles):
-            if other is particle:
-                continue
-            distance = _hypot_distance(other.position, particle.position)
-            radii_sum = _sum_dist(other.properties.get("radius", 5), radius)
-            if distance < radii_sum:
-                half_distance = (radii_sum - distance) / 2
-                dx, dy, ox, oy, x, y = _adjust(other.position, particle.position)
-                particle.position = (x + dx / distance * half_distance, y + dy / distance * half_distance)
-                other.position = (ox - dx / distance * half_distance, oy - dy / distance * half_distance)
-        return particle
-
-    return constraint
-
-
 def collision_constraint_2(grid):
     def constraint(particle):
         radius = particle.properties.get("radius", 5)
@@ -171,7 +151,7 @@ def collision_constraint_2(grid):
             if distance < radii_sum:
                 half_distance = (radii_sum - distance) / 2
                 dx, dy, ox, oy, x, y = _adjust(other.position, particle.position)
-                if distance== 0:
+                if distance == 0:
                     distance = 0.0001
                 particle.position = (x + dx / distance * half_distance, y + dy / distance * half_distance)
                 other.position = (ox - dx / distance * half_distance, oy - dy / distance * half_distance)
@@ -253,4 +233,21 @@ def screen_constraint(screen_size):
             particle.position = x, screen_size[1] - radius
         return particle
 
+    return constraint
+
+
+# link constraint, links two particles together
+def link_constraint(particle_2, distance, rigidity = 1):
+    def constraint(particle: Particle) -> Particle:
+        x, y = particle.position
+        ox, oy = particle.old_position
+        dx, dy = x - ox, y - oy
+        particle.old_position = x - dx * rigidity, y - dy * rigidity
+        x, y = particle.position
+        ox, oy = particle_2.position
+        dx, dy = x - ox, y - oy
+        distance_2 = (dx ** 2 + dy ** 2) ** 0.5
+        if distance_2 != 0:
+            particle.position = ox + dx / distance_2 * distance, oy + dy / distance_2 * distance
+        return particle
     return constraint

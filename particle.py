@@ -112,11 +112,9 @@ def gravity(acceleration: float = 3) -> Constraint:
 def friction(friction_coefficient = .99) -> Constraint:
     def constraint(particle: Particle) -> Particle:
         x, y = particle.position
-        ox, oy = particle.old_position
-        vx, vy = x - ox, y - oy
+        vx, vy = particle.velocity
         particle.old_position = x - vx * friction_coefficient, y - vy * friction_coefficient
         return particle
-
     return constraint
 
 
@@ -134,8 +132,8 @@ def _sum_dist(other_radius, radius):
 
 
 @functools.lru_cache(maxsize = 1000)
-def _hypot_distance(other, particle):
-    distance = math.hypot(particle[0] - other[0], particle[1] - other[1])
+def _hypot_distance(other_particle, particle_position):
+    distance = math.hypot(particle_position[0] - other_particle[0], particle_position[1] - other_particle[1])
     return distance
 
 
@@ -143,7 +141,6 @@ def collision_constraint_2(grid):
     def constraint(particle):
         radius = particle.properties.get("radius", 5)
         for other in grid.get_nearby_particles(particle):
-
             if other is particle:
                 continue
             distance = _hypot_distance(other.position, particle.position)
